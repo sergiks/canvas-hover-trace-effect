@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+
+<html lang="">
+<head>
+    <meta charset="utf-8">
+
+    <title>Hover effect</title>
+	<style>
+		body{ background-color:#333;
+			margin:0; padding:0
+		}
+		canvas {border:none}
+   </style>
+</head>
+
+<body>
+	
+	<script>
+		"use strict";
+
+		// create canvas
+		var canvas = document.createElement('canvas')
+			, ctx = canvas.getContext('2d')
+			, i
+			, Point = function( x, y) {
+				this.x = x || 0
+				, this.y = y || 0
+				, this.v = 0	// current value
+				, this.t = 0	// target value
+			}
+			, points = []
+			, radius = 8
+			, x, y
+			, needUpdate = true
+		;
+		
+		Point.prototype.render = function(ctx) {
+			var delta;
+			ctx.fillStyle = "rgba(255,255,255," + (0.1 + 0.9 * this.v) + ")";
+		    ctx.beginPath();
+			ctx.arc( this.x, this.y, radius, 0, Math.PI * 2);
+			ctx.fill();
+			delta = 0.06 * (this.t - this.v);  // speed of fade
+			this.v += delta;
+			return delta * delta > 1e-5;
+		}
+
+		// setup canvas
+		canvas.width  = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+		document.body.appendChild(canvas);
+		
+		// initialize points
+		for( x = 1.5 * radius; x < canvas.width; x += 4 * radius) {
+			for( y = 1.5 * radius; y < canvas.width; y += 4 * radius) {
+				points.push( new Point( x, y));
+			}
+		}
+
+		// on mouse move
+		document.body.addEventListener('mousemove', function(e) {
+			var pos = canvas.getBoundingClientRect()
+			  , x = e.clientX - pos.left - 2
+			  , y = e.clientY - pos.top - 2
+			  , i, dx, dy, distance, p
+			;
+			
+			// update points
+			for(i = 0; i < points.length; i++) {
+				p = points[i];
+				dx = p.x - x;
+				dy = p.y - y;
+				distance = Math.sqrt( dx * dx + dy * dy);
+				p.t = 1 / (1 + Math.exp( 6 * (distance / (8 * radius) - 1)));
+			}
+			
+			if( !needUpdate) render();
+		});
+		
+		// on every frame render
+		function render() {
+			var p, i, changed = false;
+
+			// erase canvas
+			ctx.fillStyle = "rgba(0,0,0,1)";
+			ctx.fillRect( 0, 0, canvas.width, canvas.height);
+
+			// render points
+			for(i = 0; i < points.length; i++) {
+				p = points[i];
+				changed = p.render(ctx) || changed;
+			}
+			
+			needUpdate = changed;
+			
+			if( needUpdate) window.requestAnimationFrame(render);
+		}
+		
+		render();
+	</script>
+</body>
+</html>
