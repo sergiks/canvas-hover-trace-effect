@@ -31,17 +31,71 @@
 			, points = []
 			, radius = 8
 			, x, y
+			, follower
 			, needUpdate = true
 		;
 		
+		// mouse follower / smoother
+		function Follower(x,y) {
+			this.x = x || 0;
+			this.y = y || 0;
+			this.tx = x;
+			this.ty = y;
+		}
+		
+		Follower.prototype.update = function(delta) {
+			var dx, dy;
+			
+			delta = delta || 0.05;
+
+			dx = delta * (this.tx - this.x);
+			dy = delta * (this.ty - this.y);
+			
+			this.x += dx;
+			this.y += dy;
+
+			//return true;
+			return dx * dx + dy * dy > 1;
+		}
+
+
+		// for debugging
+		Follower.prototype.render = function(ctx, isActive) {
+			ctx.fillStyle = isActive ? "#33F" : "#009";
+			ctx.fillRect( this.x-2, this.y-2, 4, 4);
+
+			ctx.fillStyle = isActive ? "#3F3" : "#090";
+			ctx.fillRect( this.tx-2, this.ty-2, 4, 4);
+		}
+		
+		
+		Follower.prototype.goto = function(tx, ty) {
+			this.tx = tx;
+			this.ty = ty;
+
+			return this.update();
+		}
+
+
+		function map( lo, hi, v) {
+			return lo + Math.floor( v * (hi - lo));
+		}
+		
 		Point.prototype.render = function(ctx) {
-			var delta;
-			ctx.fillStyle = "rgba(255,255,255," + (0.1 + 0.9 * this.v) + ")";
+			var delta
+			  , r = map( 240, 255, this.v)
+			  , g = map( 240, 0, this.v)
+			  , b = map( 240, 0, this.v)
+			  , a = map( 10, 255, this.v)
+			;
+			ctx.fillStyle = "rgba(" +[r,g,b,a].join(',') + ")";
 		    ctx.beginPath();
 			ctx.arc( this.x, this.y, radius, 0, Math.PI * 2);
 			ctx.fill();
+
 			delta = 0.06 * (this.t - this.v);  // speed of fade
 			this.v += delta;
+
 			return delta * delta > 1e-5;
 		}
 
@@ -51,6 +105,9 @@
 
 		document.body.appendChild(canvas);
 		
+		
+		follower = new Follower( canvas.width/2, canvas.height/2);
+
 		// initialize points
 		for( x = 1.5 * radius; x < canvas.width; x += 4 * radius) {
 			for( y = 1.5 * radius; y < canvas.width; y += 4 * radius) {
@@ -66,24 +123,35 @@
 			  , i, dx, dy, distance, p
 			;
 			
-			// update points
+			// update follower
+			follower.goto(x,y);
+			
+			if( !needUpdate) render(); // wake up?
+		});
+		
+		
+		function updatePoints() {
+			var i, p, dx, dy, distance;
+
 			for(i = 0; i < points.length; i++) {
 				p = points[i];
-				dx = p.x - x;
-				dy = p.y - y;
+				dx = p.x - follower.x;
+				dy = p.y - follower.y;
 				distance = Math.sqrt( dx * dx + dy * dy);
 				p.t = 1 / (1 + Math.exp( 6 * (distance / (8 * radius) - 1)));
 			}
-			
-			if( !needUpdate) render();
-		});
+		}
 		
 		// on every frame render
 		function render() {
 			var p, i, changed = false;
 
+			// update follower
+			changed = follower.update(0.1);
+			if( changed) updatePoints();
+
 			// erase canvas
-			ctx.fillStyle = "rgba(0,0,0,1)";
+			ctx.fillStyle = "rgba(255,255,255,1)";
 			ctx.fillRect( 0, 0, canvas.width, canvas.height);
 
 			// render points
@@ -91,6 +159,8 @@
 				p = points[i];
 				changed = p.render(ctx) || changed;
 			}
+
+			//follower.render(ctx, changed); // debugging only
 			
 			needUpdate = changed;
 			
